@@ -1,0 +1,9 @@
+uniface>=0.2.0
+opencv-python>=4.8.0
+pytest
+numpy>=1.24.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+typer>=0.9.0
+pydantic>=2.0.0
+rich>=13.0.0
