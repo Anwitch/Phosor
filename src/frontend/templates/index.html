@@ -254,19 +254,6 @@
             </div>
         </div>
     </div>
-    <div class="flex gap-3">
-        <button @click="submitMoveImage()" :disabled="moveModal.loading || !moveModal.targetClusterId"
-            class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
-            <span x-show="!moveModal.loading">Move</span>
-            <span x-show="moveModal.loading">Moving...</span>
-        </button>
-        <button @click="closeMoveModal()" :disabled="moveModal.loading"
-            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition">
-            Cancel
-        </button>
-    </div>
-</div>
-</div>
 </div>
 {% endblock %}
 
