@@ -14,7 +14,7 @@ from core.file_scanner import scan_images
 from core.face_engine import FaceEngine
 from core.utils import build_face_dataset, save_embeddings, save_cluster_summary
 from core.clustering import cluster_faces, build_cluster_summary
-from core.folder_manager import materialize_clusters
+from core.folder_manager import materialize_clusters, create_cluster_representatives
 
 app = typer.Typer(
     name="phosor",
@@ -51,7 +51,7 @@ def scan(
         None, "--output", "-o", help="Output folder for clusters"
     ),
     config: Optional[str] = typer.Option(
-        None, "--config", "-c", help="Path to config file"
+        "configs/config.toml", "--config", "-c", help="Path to config file"
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Run without copying/moving files"
@@ -128,14 +128,26 @@ def scan(
     console.print(f"  Found {len(summaries)} valid clusters\n")
     
     # Step 5: Organize files
-    console.print("[yellow]Step 5/6:[/yellow] Organizing photos into folders...")
+    console.print("[yellow]Step 5/7:[/yellow] Organizing photos into folders...")
     materialize_clusters(
         faces, summaries, cfg.output.dir, mode=cfg.output.mode, dry_run=dry_run
     )
     console.print("  Files organized\n")
     
+    # Step 5.5: Create representative images for each cluster
+    if cfg.output.create_representatives:
+        console.print("[yellow]Step 6/7:[/yellow] Creating representative face images...")
+        create_cluster_representatives(
+            faces, 
+            summaries, 
+            cfg.output.dir, 
+            mode=cfg.output.representative_mode,
+            dry_run=dry_run
+        )
+        console.print(f"  Created representatives (mode: {cfg.output.representative_mode})\n")
+    
     # Step 6: Save metadata
-    console.print("[yellow]Step 6/6:[/yellow] Saving metadata...")
+    console.print("[yellow]Step 7/7:[/yellow] Saving metadata...")
     if cfg.handling.save_embeddings:
         save_embeddings(faces, f"{cfg.output.dir}/embeddings.json")
     save_cluster_summary(summaries, f"{cfg.output.dir}/clusters_summary.json")

@@ -6,6 +6,8 @@ min_file_size_kb = 50
 [output]
 dir = "data/output"
 mode = "copy"  # copy | move
+create_representatives = true  # Create representative face images in cluster folders
+representative_mode = "crop"  # crop | bbox | annotated
 
 [clustering]
 method = "dbscan"  # dbscan | kmeans

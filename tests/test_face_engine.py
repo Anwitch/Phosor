@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 try:
-    from core.face_engine import FaceEngine, UNIFACE_AVAILABLE
+    from src.core.face_engine import FaceEngine, UNIFACE_AVAILABLE
 except ImportError:
     UNIFACE_AVAILABLE = False
 
@@ -74,12 +74,12 @@ def test_uniface_import():
     """Test that UniFace import status is tracked."""
     # This test always runs to verify the import guard works
     if UNIFACE_AVAILABLE:
-        from core.face_engine import FaceEngine
+        from src.core.face_engine import FaceEngine
         # Should be able to create instance
         engine = FaceEngine()
         assert engine is not None
     else:
         # Should raise ImportError when trying to initialize
         with pytest.raises(ImportError):
-            from core.face_engine import FaceEngine
+            from src.core.face_engine import FaceEngine
             FaceEngine()

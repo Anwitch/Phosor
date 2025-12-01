@@ -5,6 +5,9 @@ import shutil
 from pathlib import Path
 from collections import defaultdict
 
+import cv2
+import numpy as np
+
 from core.models import ClusterSummary, FaceRecord
 
 logger = logging.getLogger(__name__)
@@ -108,9 +111,132 @@ def materialize_clusters(
                         raise ValueError(f"Unknown mode: {mode}")
                     total_copied += 1
                 except Exception as e:
-                    logger.error(f"Error processing {src_path}: {e}")
-
+                    logger.error(f"Failed to {mode} {src_path}: {e}")
+    
     if not dry_run:
         logger.info(f"Successfully {mode}d {total_copied} images")
     else:
         logger.info(f"[DRY RUN] Would {mode} {total_copied} images")
+
+
+def create_cluster_representatives(
+    faces: list[FaceRecord],
+    cluster_summaries: list[ClusterSummary],
+    output_dir: str,
+    mode: str = "crop",
+    dry_run: bool = False,
+) -> None:
+    """Create representative face images for each cluster.
+    
+    Creates a visual reference showing which person each cluster represents.
+    Saves as '_representative.jpg' in each cluster folder.
+    
+    Args:
+        faces: List of FaceRecord with cluster assignments and bboxes.
+        cluster_summaries: List of cluster summaries.
+        output_dir: Base output directory.
+        mode: How to create representative:
+            - "crop": Crop just the face region (square)
+            - "bbox": Draw bounding box on full image
+            - "annotated": Full image with bbox and confidence
+        dry_run: If True, only log actions without executing.
+    """
+    output_path = Path(output_dir)
+    
+    # Group faces by cluster
+    cluster_faces = defaultdict(list)
+    for face in faces:
+        if face.cluster_id is not None and face.cluster_id >= 0:
+            cluster_faces[face.cluster_id].append(face)
+    
+    created_count = 0
+    
+    for summary in cluster_summaries:
+        cluster_id = summary.cluster_id
+        cluster_label = summary.label
+        
+        if cluster_id not in cluster_faces:
+            logger.warning(f"No faces found for cluster {cluster_id}")
+            continue
+        
+        # Get the first face (usually highest confidence or first detected)
+        representative_face = cluster_faces[cluster_id][0]
+        
+        # Load the source image
+        image_path = representative_face.image_path
+        image = cv2.imread(image_path)
+        
+        if image is None:
+            logger.warning(f"Could not load image: {image_path}")
+            continue
+        
+        # Get bounding box
+        x1, y1, x2, y2 = representative_face.bbox
+        
+        # Create representative image based on mode
+        if mode == "crop":
+            # Crop the face region with some padding
+            padding = 30
+            h, w = image.shape[:2]
+            
+            # Add padding and ensure within image bounds
+            x1_pad = max(0, x1 - padding)
+            y1_pad = max(0, y1 - padding)
+            x2_pad = min(w, x2 + padding)
+            y2_pad = min(h, y2 + padding)
+            
+            # Crop the face
+            face_crop = image[y1_pad:y2_pad, x1_pad:x2_pad]
+            
+            # Resize to standard size for consistency
+            if face_crop.size > 0:
+                target_size = 200
+                face_crop = cv2.resize(face_crop, (target_size, target_size))
+            
+            output_image = face_crop
+            
+        elif mode == "bbox":
+            # Draw bounding box on full image
+            output_image = image.copy()
+            cv2.rectangle(output_image, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            
+        elif mode == "annotated":
+            # Full image with bbox and label
+            output_image = image.copy()
+            
+            # Draw bounding box
+            cv2.rectangle(output_image, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            
+            # Add label
+            label_text = f"{cluster_label}"
+            cv2.putText(
+                output_image,
+                label_text,
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.9,
+                (0, 255, 0),
+                2
+            )
+        else:
+            logger.warning(f"Unknown mode: {mode}, using crop")
+            output_image = image[y1:y2, x1:x2]
+        
+        # Save representative image
+        cluster_folder = output_path / cluster_label
+        representative_path = cluster_folder / "_representative.jpg"
+        
+        if dry_run:
+            logger.info(f"[DRY RUN] Would create representative: {representative_path}")
+        else:
+            try:
+                cv2.imwrite(str(representative_path), output_image)
+                created_count += 1
+                logger.debug(f"Created representative for {cluster_label}")
+            except Exception as e:
+                logger.error(f"Failed to create representative for {cluster_label}: {e}")
+    
+    if not dry_run:
+        logger.info(f"Created {created_count} cluster representative images")
+    else:
+        logger.info(f"[DRY RUN] Would create {created_count} representative images")

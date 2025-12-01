@@ -4,7 +4,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from core.config import load_config, PhosorConfig
+from src.core.config import load_config, PhosorConfig
 
 
 def test_load_config_defaults():

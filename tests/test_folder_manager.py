@@ -4,8 +4,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from core.models import ClusterSummary, FaceRecord
-from core.folder_manager import prepare_output_dirs, materialize_clusters
+from src.core.models import ClusterSummary, FaceRecord
+from src.core.folder_manager import prepare_output_dirs, materialize_clusters
 
 
 def test_prepare_output_dirs():

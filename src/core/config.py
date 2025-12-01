@@ -1,6 +1,7 @@
 """Configuration handling for Phosor."""
 
 import sys
+import re
 from pathlib import Path
 from typing import Optional, Literal
 
@@ -9,7 +10,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class InputConfig(BaseModel):
@@ -18,6 +19,14 @@ class InputConfig(BaseModel):
     dir: str
     recursive: bool = True
     min_file_size_kb: int = 50
+    
+    @field_validator('dir')
+    @classmethod
+    def normalize_path(cls, v: str) -> str:
+        """Normalize Windows/Unix paths and handle raw strings."""
+        # Convert single backslashes to forward slashes for consistency
+        # This allows users to use C:\path or C:\\path in TOML
+        return str(Path(v).as_posix())
 
 
 class OutputConfig(BaseModel):
@@ -25,6 +34,14 @@ class OutputConfig(BaseModel):
 
     dir: str
     mode: Literal["copy", "move"] = "copy"
+    create_representatives: bool = True
+    representative_mode: Literal["crop", "bbox", "annotated"] = "crop"
+    
+    @field_validator('dir')
+    @classmethod
+    def normalize_path(cls, v: str) -> str:
+        """Normalize Windows/Unix paths and handle raw strings."""
+        return str(Path(v).as_posix())
 
 
 class ClusteringConfig(BaseModel):
@@ -48,6 +65,12 @@ class LoggingConfig(BaseModel):
 
     level: str = "INFO"
     file: str = "logs/phosor.log"
+    
+    @field_validator('file')
+    @classmethod
+    def normalize_path(cls, v: str) -> str:
+        """Normalize Windows/Unix paths and handle raw strings."""
+        return str(Path(v).as_posix())
 
 
 class PhosorConfig(BaseModel):
@@ -74,8 +97,24 @@ def load_config(path: Optional[str] = None) -> PhosorConfig:
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
 
-        with open(config_path, "rb") as f:
-            config_dict = tomllib.load(f)
+        # Read and preprocess TOML to handle Windows paths
+        with open(config_path, "r", encoding="utf-8") as f:
+            toml_content = f.read()
+        
+        # Replace single backslashes with double backslashes in path values
+        # This handles Windows paths like C:\Users -> C:\\Users
+        import re
+        def fix_windows_path(match):
+            path_value = match.group(1)
+            # Replace single backslashes with double backslashes
+            fixed_path = path_value.replace('\\', '\\\\')
+            return f'"{fixed_path}"'
+        
+        # Match quoted strings that look like Windows paths (contain :\ or starts with \)
+        toml_content = re.sub(r'"([A-Za-z]:[^"]*)"', fix_windows_path, toml_content)
+        
+        # Parse the preprocessed TOML
+        config_dict = tomllib.loads(toml_content)
         return PhosorConfig(**config_dict)
 
     # Return default config

@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from core.file_scanner import scan_images
+from src.core.file_scanner import scan_images
 
 
 def test_scan_images_empty_dir():

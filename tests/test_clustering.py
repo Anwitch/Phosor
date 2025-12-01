@@ -3,8 +3,8 @@
 import pytest
 import numpy as np
 
-from core.models import FaceRecord, ClusterSummary
-from core.clustering import cluster_faces, build_cluster_summary
+from src.core.models import FaceRecord, ClusterSummary
+from src.core.clustering import cluster_faces, build_cluster_summary
 
 
 def create_mock_face(face_id: int, embedding: list[float], image_path: str = "test.jpg") -> FaceRecord:

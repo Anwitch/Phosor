@@ -192,3 +192,5 @@ cache/
 # Temporary files
 temp/
 tmp/
+
+config.toml

@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 sys.path.insert(0, 'src')
 
-from core.face_engine import FaceEngine
+from src.core.face_engine import FaceEngine
 
 print("Testing FaceEngine with sample image...")
 print("=" * 60)
