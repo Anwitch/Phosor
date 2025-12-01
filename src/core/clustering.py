@@ -76,14 +76,15 @@ def build_cluster_summary(faces: list[FaceRecord]) -> list[ClusterSummary]:
             cluster_data[face.cluster_id].append(face)
 
     summaries = []
-    for cluster_id in sorted(cluster_data.keys()):
+    # Use sequential numbering for labels (1, 2, 3...) instead of cluster_id
+    for label_index, cluster_id in enumerate(sorted(cluster_data.keys()), start=1):
         cluster_faces = cluster_data[cluster_id]
         
         # Get unique image paths (first 3 as samples)
         unique_images = list(dict.fromkeys([f.image_path for f in cluster_faces]))
         sample_images = unique_images[:3]
 
-        label = f"Person_{cluster_id + 1:02d}"
+        label = f"Person_{label_index:02d}"
         
         summary = ClusterSummary(
             cluster_id=cluster_id,

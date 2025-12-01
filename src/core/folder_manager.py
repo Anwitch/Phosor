@@ -69,11 +69,15 @@ def materialize_clusters(
     """
     # Prepare output directories
     cluster_paths = prepare_output_dirs(output_dir, cluster_summaries)
+    
+    # Create set of valid cluster IDs (from summaries only)
+    valid_cluster_ids = {s.cluster_id for s in cluster_summaries}
+    valid_cluster_ids.add(-1)  # Include unclustered
 
-    # Group images by cluster
+    # Group images by cluster (only valid ones)
     cluster_images = defaultdict(set)
     for face in faces:
-        if face.cluster_id is not None:
+        if face.cluster_id is not None and face.cluster_id in valid_cluster_ids:
             cluster_images[face.cluster_id].add(face.image_path)
 
     # Process each cluster

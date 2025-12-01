@@ -125,6 +125,10 @@ def scan(
         if s.num_faces >= cfg.clustering.min_faces_per_cluster
     ]
     
+    # Re-label sequentially after filtering
+    for idx, summary in enumerate(sorted(summaries, key=lambda s: s.cluster_id), start=1):
+        summary.label = f"Person_{idx:02d}"
+    
     console.print(f"  Found {len(summaries)} valid clusters\n")
     
     # Step 5: Organize files
@@ -189,6 +193,41 @@ def summary(
     
     console.print(table)
     console.print(f"\nTotal clusters: {len(clusters)}")
+
+
+@app.command()
+def serve(
+    host: str = typer.Option(
+        "127.0.0.1", "--host", "-h", help="Host to bind the server to"
+    ),
+    port: int = typer.Option(
+        8000, "--port", "-p", help="Port to bind the server to"
+    ),
+    reload: bool = typer.Option(
+        False, "--reload", help="Enable auto-reload for development"
+    ),
+    config: Optional[str] = typer.Option(
+        "configs/config.toml", "--config", "-c", help="Path to config file"
+    ),
+):
+    """Start the Phosor web dashboard server."""
+    import uvicorn
+    
+    console.print("[bold blue]Starting Phosor Web Dashboard[/bold blue]")
+    console.print(f"Server: http://{host}:{port}")
+    console.print(f"Config: {config}")
+    if reload:
+        console.print("[yellow]Development mode: auto-reload enabled[/yellow]")
+    console.print()
+    
+    # Run uvicorn server
+    uvicorn.run(
+        "frontend.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":

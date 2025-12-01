@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+
+{% block title %}{{ cluster.label }} - Phosor{% endblock %}
+
+{% block content %}
+<div x-data="clusterDetail({{ cluster.cluster_id }})" x-init="init()" x-cloak>
+    <!-- Back Button -->
+    <div class="mb-6">
+        <a href="/" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Cluster Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="flex items-start justify-between">
+            <div class="flex items-start gap-6 flex-1">
+                <!-- Representative Image -->
+                <div class="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                    <img :src="`/api/images/representative/${cluster.label}`" :alt="cluster.label"
+                        class="w-full h-full object-cover"
+                        @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23ddd%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2216%22%3ENo Image%3C/text%3E%3C/svg%3E'">
+                </div>
+
+                <!-- Cluster Info -->
+                <div class="flex-1">
+                    <!-- Editable Label -->
+                    <div x-show="!editing" class="flex items-center gap-3 mb-2">
+                        <h1 class="text-2xl font-bold text-gray-900" x-text="cluster.label"></h1>
+                        <button @click="startEdit()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div x-show="editing" class="mb-2">
+                        <input type="text" x-model="newLabel" @keyup.enter="saveLabel()" @keyup.escape="cancelEdit()"
+                            class="text-2xl font-bold border-b-2 border-indigo-500 focus:outline-none px-2 py-1"
+                            x-ref="labelInput">
+                        <div class="flex gap-2 mt-2">
+                            <button @click="saveLabel()"
+                                class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                Save
+                            </button>
+                            <button @click="cancelEdit()"
+                                class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Statistics -->
+                    <div class="flex gap-6 text-sm text-gray-600 mb-4">
+                        <div>
+                            <span class="font-semibold text-gray-900" x-text="cluster.num_faces"></span>
+                            <span>faces detected</span>
+                        </div>
+                        <div>
+                            <span class="font-semibold text-gray-900" x-text="images.length"></span>
+                            <span>images</span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex gap-2">
+                        <button @click="downloadCluster()"
+                            class="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                            Download All
+                        </button>
+                        <button @click="showMergeModal = true"
+                            class="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                            Merge with...
+                        </button>
+                        <button @click="deleteCluster()"
+                            class="px-4 py-2 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                            Delete Cluster
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Gallery -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Images in this Cluster</h2>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+
+        <!-- Error State -->
+        <div x-show="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p class="text-red-800" x-text="error"></p>
+        </div>
+
+        <!-- Gallery Grid -->
+        <div x-show="!loading && !error"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <template x-for="(image, index) in images" :key="image.filename">
+                <div class="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+                    <img :src="`/api/images/${cluster.label}/${image.filename}`" :alt="image.filename"
+                        @click="openLightbox(index)"
+                        class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition" loading="lazy">
+                    <!-- Delete Button -->
+                    <button @click.stop="deleteImage(image.filename, index)"
+                        class="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg"
+                        title="Delete image">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="!loading && !error && images.length === 0" class="text-center py-12">
+            <p class="text-gray-500">No images found in this cluster</p>
+        </div>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div x-show="lightbox.show" @click="closeLightbox()" @keyup.escape.window="closeLightbox()"
+        class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4" style="display: none;">
+        <!-- Navigation Arrows -->
+        <button @click.stop="prevImage()"
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+
+        <!-- Image Container -->
+        <div class="max-w-6xl max-h-full flex flex-col items-center">
+            <img x-show="lightbox.currentIndex >= 0"
+                :src="lightbox.currentIndex >= 0 ? `/api/images/${cluster.label}/${images[lightbox.currentIndex]?.filename}` : ''"
+                class="max-w-full max-h-[85vh] object-contain" @click.stop>
+
+            <!-- Image Info -->
+            <div class="mt-4 text-white text-center">
+                <p class="text-lg font-medium" x-text="images[lightbox.currentIndex]?.filename"></p>
+                <p class="text-sm text-gray-300">
+                    <span x-text="lightbox.currentIndex + 1"></span> / <span x-text="images.length"></span>
+                </p>
+            </div>
+        </div>
+
+        <button @click.stop="nextImage()"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </button>
+
+        <!-- Close Button -->
+        <button @click.stop="closeLightbox()" class="absolute top-4 right-4 text-white hover:text-gray-300 p-2">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Merge Modal -->
+    <div x-show="showMergeModal" @click.self="showMergeModal = false"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Merge with Another Cluster</h3>
+
+            <p class="text-sm text-gray-600 mb-4">
+                Select a cluster to merge <strong x-text="cluster.label"></strong> into. All images will be moved to the
+                selected cluster.
+            </p>
+
+            <!-- Search Box -->
+            <div class="mb-4">
+                <input type="text" x-model="mergeSearchQuery" @input="filterMergeClusters()"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Search clusters...">
+            </div>
+
+            <!-- Cluster Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Target Cluster</label>
+                <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto">
+                    <template x-for="targetCluster in filteredMergeClusters" :key="targetCluster.cluster_id">
+                        <label
+                            class="flex items-center justify-between py-3 px-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                            <div class="flex items-center flex-1">
+                                <input type="radio" :value="targetCluster.cluster_id" x-model="selectedMergeTarget"
+                                    class="mr-3 h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900" x-text="targetCluster.label"></p>
+                                    <p class="text-xs text-gray-500" x-text="`${targetCluster.num_images} images`"></p>
+                                </div>
+                            </div>
+                            <!-- Representative Thumbnail -->
+                            <div class="w-12 h-12 bg-gray-100 rounded overflow-hidden ml-3 flex-shrink-0">
+                                <img :src="`/api/images/representative/${targetCluster.label}`"
+                                    :alt="targetCluster.label" class="w-full h-full object-cover"
+                                    @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E%3Crect fill=%22%23ddd%22 width=%2248%22 height=%2248%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%228%22%3E?%3C/text%3E%3C/svg%3E'">
+                            </div>
+                        </label>
+                    </template>
+                    <div x-show="filteredMergeClusters.length === 0" class="text-sm text-gray-400 py-4 text-center">
+                        No clusters found
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button @click="submitMerge()" :disabled="!selectedMergeTarget || mergeLoading"
+                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                    <span x-show="!mergeLoading">Merge Clusters</span>
+                    <span x-show="mergeLoading">Merging...</span>
+                </button>
+                <button @click="closeMergeModal()" :disabled="mergeLoading"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function clusterDetail(clusterId) {
+        return {
+            clusterId: clusterId,
+            cluster: {{ cluster | tojson | safe }},
+            images: [],
+            loading: false,
+            error: null,
+            editing: false,
+            newLabel: '',
+            showMergeModal: false,
+            allClusters: [],
+            filteredMergeClusters: [],
+            selectedMergeTarget: null,
+            mergeSearchQuery: '',
+            mergeLoading: false,
+            lightbox: {
+                show: false,
+                currentIndex: -1,
+            },
+
+            async init() {
+                await this.loadImages();
+                await this.loadAllClusters();
+            },
+
+            async loadImages() {
+                this.loading = true;
+                this.error = null;
+
+                try {
+                    const response = await fetch(`/api/clusters/${this.clusterId}/images`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load images: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    this.images = data.images || [];
+                } catch (err) {
+                    this.error = err.message;
+                    console.error('Error loading images:', err);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async loadAllClusters() {
+                try {
+                    const response = await fetch('/api/clusters');
+                    if (!response.ok) {
+                        throw new Error('Failed to load clusters');
+                    }
+
+                    this.allClusters = await response.json();
+                    // exclude current cluster
+                    this.filteredMergeClusters = this.allClusters.filter(
+                        (c) => c.cluster_id !== this.clusterId,
+                    );
+                } catch (err) {
+                    console.error('Error loading clusters:', err);
+                }
+            },
+
+            filterMergeClusters() {
+                const query = this.mergeSearchQuery.toLowerCase();
+                const base = this.allClusters.filter(
+                    (c) => c.cluster_id !== this.clusterId,
+                );
+
+                if (!query) {
+                    this.filteredMergeClusters = base;
+                } else {
+                    this.filteredMergeClusters = base.filter((c) =>
+                        c.label.toLowerCase().includes(query),
+                    );
+                }
+            },
+
+            closeMergeModal() {
+                this.showMergeModal = false;
+                this.selectedMergeTarget = null;
+                this.mergeSearchQuery = '';
+                this.filterMergeClusters();
+            },
+
+            async submitMerge() {
+                if (!this.selectedMergeTarget || this.mergeLoading) return;
+
+                const targetCluster = this.allClusters.find(
+                    (c) => c.cluster_id === this.selectedMergeTarget,
+                );
+
+                if (
+                    !confirm(
+                        `Merge "${this.cluster.label}" into "${targetCluster?.label}"? This will move all images.`,
+                    )
+                ) {
+                    return;
+                }
+
+                this.mergeLoading = true;
+
+                try {
+                    const response = await fetch('/api/clusters/merge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            source_ids: [this.clusterId],
+                            target_id: this.selectedMergeTarget,
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.detail || 'Failed to merge clusters');
+                    }
+
+                    alert('Clusters merged successfully!');
+                    window.location.href = '/';
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    console.error('Error merging clusters:', err);
+                } finally {
+                    this.mergeLoading = false;
+                }
+            },
+
+            startEdit() {
+                this.editing = true;
+                this.newLabel = this.cluster.label;
+                this.$nextTick(() => {
+                    this.$refs.labelInput?.focus();
+                });
+            },
+
+            cancelEdit() {
+                this.editing = false;
+                this.newLabel = '';
+            },
+
+            async saveLabel() {
+                if (!this.newLabel || this.newLabel === this.cluster.label) {
+                    this.cancelEdit();
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/clusters/${this.clusterId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ label: this.newLabel }),
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.detail || 'Failed to rename cluster');
+                    }
+
+                    this.cluster.label = this.newLabel;
+                    this.cancelEdit();
+                    alert('Cluster renamed successfully!');
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    console.error('Error renaming cluster:', err);
+                }
+            },
+
+            openLightbox(index) {
+                this.lightbox.show = true;
+                this.lightbox.currentIndex = index;
+            },
+
+            closeLightbox() {
+                this.lightbox.show = false;
+                this.lightbox.currentIndex = -1;
+            },
+
+            nextImage() {
+                if (this.lightbox.currentIndex < this.images.length - 1) {
+                    this.lightbox.currentIndex++;
+                } else {
+                    this.lightbox.currentIndex = 0;
+                }
+            },
+
+            prevImage() {
+                if (this.lightbox.currentIndex > 0) {
+                    this.lightbox.currentIndex--;
+                } else {
+                    this.lightbox.currentIndex = this.images.length - 1;
+                }
+            },
+
+            downloadCluster() {
+                alert(
+                    'Download feature coming soon!\nThis will create a ZIP file of all images in this cluster.',
+                );
+            },
+
+            async deleteImage(filename, index) {
+                if (!confirm(`Delete "${filename}"? This action cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(
+                        `/api/images/${this.clusterId}/${filename}`,
+                        { method: 'DELETE' },
+                    );
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.detail || 'Failed to delete image');
+                    }
+
+                    // Remove from local array
+                    this.images.splice(index, 1);
+
+                    // Update cluster face count
+                    if (this.cluster.num_faces > 0) {
+                        this.cluster.num_faces--;
+                    }
+
+                    alert('Image deleted successfully!');
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    console.error('Error deleting image:', err);
+                }
+            },
+
+            async deleteCluster() {
+                if (
+                    !confirm(
+                        `Delete cluster "${this.cluster.label}" and all its images? This action cannot be undone.`,
+                    )
+                ) {
+                    return;
+                }
+
+                if (
+                    !confirm(
+                        `Are you absolutely sure? This will permanently delete ${this.images.length} images.`,
+                    )
+                ) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/clusters/${this.clusterId}`, {
+                        method: 'DELETE',
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.detail || 'Failed to delete cluster');
+                    }
+
+                    alert('Cluster deleted successfully!');
+                    window.location.href = '/';
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    console.error('Error deleting cluster:', err);
+                }
+            },
+        };
+    }
+</script>
+{% endblock %}
