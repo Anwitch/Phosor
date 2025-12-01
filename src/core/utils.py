@@ -31,21 +31,18 @@ def process_image(image_path: str, engine: FaceEngine) -> list[FaceRecord]:
         logger.error(f"Failed to load image: {image_path}")
         return []
 
-    # Detect faces
-    faces = engine.detect_faces(image)
-    if not faces:
-        logger.debug(f"No faces detected in {image_path}")
+    # Detect faces and extract embeddings
+    results = engine.process_single_image(image)
+    
+    if not results:
+        logger.debug(f"No faces detected or embedded in {image_path}")
         return []
 
-    # Extract embeddings
+    # Convert to FaceRecord
     face_records = []
-    for idx, face in enumerate(faces):
-        embedding = engine.embed_face(image, face)
-        if embedding is None:
-            logger.warning(f"Failed to extract embedding for face {idx} in {image_path}")
-            continue
-
-        bbox = face.get("bbox", (0, 0, 0, 0))
+    for idx, (face_dict, embedding) in enumerate(results):
+        bbox = face_dict.get("bbox", (0, 0, 0, 0))
+        
         face_record = FaceRecord(
             id=0,  # Will be assigned later
             image_path=image_path,
@@ -54,7 +51,8 @@ def process_image(image_path: str, engine: FaceEngine) -> list[FaceRecord]:
             embedding=embedding.tolist() if isinstance(embedding, np.ndarray) else embedding,
         )
         face_records.append(face_record)
-
+    
+    logger.debug(f"Extracted {len(face_records)} face(s) from {image_path}")
     return face_records
 
 

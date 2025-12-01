@@ -210,7 +210,7 @@ Steps for the agent (in `src/core/cli.py`):
 
 **Goal:** Wrap UniFace to provide a simple API: detect faces and get embeddings.
 
-### 4.1 Implement FaceEngine Class
+### 4.1 Implement FaceEngine Class ✅
 
 Steps for the agent (in `src/core/face_engine.py`):
 
@@ -229,7 +229,7 @@ Steps for the agent (in `src/core/face_engine.py`):
    * If detection fails → return empty list.
    * If embedding fails for a face → skip that face, log warning.
 
-### 4.2 Implement Single‑Image Processing Helper
+### 4.2 Implement Single‑Image Processing Helper ✅
 
 Steps for the agent (in `src/core/face_engine.py` or `src/core/utils.py`):
 
