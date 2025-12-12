@@ -6,7 +6,8 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,7 @@ def save_clusters_summary(data: List[dict]) -> None:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/clusters", response_model=List[ClusterInfo])
+@router.get("/clusters")
 async def list_clusters():
     """List all clusters from clusters_summary.json."""
     try:
@@ -120,7 +121,13 @@ async def list_clusters():
                 sample_images=cluster.get("sample_images", [])[:3],  # First 3 samples
             ))
         
-        return clusters
+        # Return with cache headers to prevent excessive refetching
+        return JSONResponse(
+            content=[c.model_dump() for c in clusters],
+            headers={
+                "Cache-Control": "public, max-age=5, must-revalidate",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -190,12 +197,18 @@ async def get_cluster_images(cluster_id: int):
                         "size": img_path.stat().st_size,
                     })
         
-        return {
-            "cluster_id": cluster_id,
-            "label": cluster["label"],
-            "images": images,
-            "total": len(images),
-        }
+        # Return with cache headers
+        return JSONResponse(
+            content={
+                "cluster_id": cluster_id,
+                "label": cluster["label"],
+                "images": images,
+                "total": len(images),
+            },
+            headers={
+                "Cache-Control": "public, max-age=5, must-revalidate",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -367,7 +380,7 @@ async def create_cluster(request: CreateClusterRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/unclustered", response_model=List[UnclusteredImage])
+@router.get("/unclustered")
 async def get_unclustered_images():
     """Get list of unclustered images."""
     try:
@@ -375,17 +388,28 @@ async def get_unclustered_images():
         unclustered_folder = output_dir / "unclustered"
         
         if not unclustered_folder.exists():
-            return []
+            return JSONResponse(
+                content=[],
+                headers={
+                    "Cache-Control": "public, max-age=5, must-revalidate",
+                }
+            )
         
         images = []
         for img_path in unclustered_folder.glob("*"):
             if img_path.is_file() and img_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]:
-                images.append(UnclusteredImage(
-                    filename=img_path.name,
-                    path=str(img_path),
-                ))
+                images.append({
+                    "filename": img_path.name,
+                    "path": str(img_path),
+                })
         
-        return images
+        # Return with cache headers
+        return JSONResponse(
+            content=images,
+            headers={
+                "Cache-Control": "public, max-age=5, must-revalidate",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
